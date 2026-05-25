@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Next To Arrive... | CORNWALL LIVE TRANSIT</title>
+
+    <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <style>
+        :root {
+            --kernow-gold: #ffcc00;
+
+            --bus: #ffcc00;
+            --coach: #ff3b3b;
+            --train: #ff8c00;
+            --ferry: #2E5894;
+            --plane: #800080;
+
+            --live-green: #2ecc71;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial Black', sans-serif;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            left: 320px;
+            background: #222;
+        }
+
+        .sidebar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 320px;
+            height: 100%;
+            z-index: 10;
+            color: white;
+
+            background:
+                linear-gradient(90deg,
+                    transparent 45%,
+                    #ffffff 45%,
+                    #ffffff 55%,
+                    transparent 55%
+                ),
+                linear-gradient(0deg,
+                    transparent 48%,
+                    #ffffff 48%,
+                    #ffffff 52%,
+                    transparent 52%
+                ),
+                #000000;
+
+            display: flex;
+            flex-direction: column;
+            padding: 25px;
+            box-sizing: border-box;
+            border-right: 2px solid #444;
+        }
+
+        .logo-container {
+            text-align: center;
+            background: var(--kernow-gold);
+            padding: 15px;
+            border-radius: 12px;
+            border: 4px solid #fff;
+            transform: rotate(-1.5deg);
+            margin-bottom: 30px;
+            box-shadow: 6px 6px 0px #222;
+        }
+
+        .logo-text {
+            color: #000;
+            margin: 0;
+            font-size: 20px;
+            text-transform: uppercase;
+            line-height: 1;
+        }
+
+        .widget {
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(12px);
+
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            border-left-width: 6px;
+
+            border-radius: 12px;
+            padding: 10px 18px;
+            margin-bottom: 18px;
+            height: 50px;
+            width: 100%;
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .widget.bus { border-left-color: var(--bus); }
+        .widget.coach { border-left-color: var(--coach); }
+        .widget.train { border-left-color: var(--train); }
+        .widget.ferry { border-left-color: var(--ferry); }
+        .widget.plane { border-left-color: var(--plane); }
+
+        .widget-content {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .widget-label {
+            font-size: 11px;
+            font-weight: bold;
+            font-family: sans-serif;
+            color: #bbb;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .widget-count {
+            font-size: 34px;
+            line-height: 1;
+            margin: 0;
+            font-family: 'Arial Black';
+        }
+
+        .bus .widget-count { color: var(--bus); }
+        .coach .widget-count { color: var(--coach); }
+        .train .widget-count { color: var(--train); }
+        .ferry .widget-count { color: var(--ferry); }
+        .plane .widget-count { color: var(--plane); }
+
+        .live-tag {
+            font-size: 9px;
+            color: var(--live-green);
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+            font-family: sans-serif;
+            font-weight: 900;
+        }
+
+        .flash-dot {
+            height: 8px;
+            width: 8px;
+            background-color: var(--live-green);
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 8px var(--live-green);
+            animation: flash-animation 1.2s infinite;
+        }
+
+        @keyframes flash-animation {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.2; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: 2px solid #000;
+            position: relative;
+            box-shadow: 0px 4px 8px rgba(0,0,0,0.5);
+        }
+
+        .route-label {
+            position: absolute;
+            top: -24px;
+            background: white;
+            color: black;
+            border: 2px solid black;
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-size: 11px;
+            font-family: sans-serif;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .bus.marker {
+            background: var(--bus);
+            border-radius: 6px;
+            width: 34px;
+            height: 34px;
+            font-size: 22px;
+        }
+
+        .coach.marker {
+            background: var(--coach);
+            border-radius: 4px;
+            width: 44px;
+            height: 30px;
+            font-size: 20px;
+        }
+
+        .train.marker {
+            background: var(--train);
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            font-size: 24px;
+        }
+
+        .ferry.marker {
+            background: var(--ferry);
+            border-radius: 50% 50% 10% 10%;
+            width: 38px;
+            height: 28px;
+            font-size: 20px;
+        }
+
+        .plane.marker {
+            background: var(--plane);
+            border-radius: 50% 50% 10% 10%;
+            width: 38px;
+            height: 28px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="sidebar">
+
+<div class="logo-container">
+    <h1 class="logo-text">Next To Arrive...</h1>
+    <div style="font-size: 9px; color: #000; font-family: sans-serif; font-weight: 900; margin-top: 4px;">
+        CORNWALL LIVE TRANSIT
+    </div>
+</div>
+
+<!-- BUS -->
+<div class="widget bus">
+    <div class="widget-content" style="flex-direction: row; align-items: center; gap: 6px;">
+        <div class="live-tag" style="margin: 0;">
+            <span class="flash-dot"></span>Live
+        </div>
+        <div class="widget-label" style="margin: 0;">Buses</div>
+    </div>
+    <div class="widget-count" id="bus-count">0</div>
+</div>
+
+<!-- COACH -->
+<div class="widget coach">
+    <div class="widget-content" style="flex-direction: row; align-items: center; gap: 6px;">
+        <div class="live-tag" style="margin: 0;">
+            <span class="flash-dot"></span>Live
+        </div>
+        <div class="widget-label" style="margin: 0;">Coaches</div>
+    </div>
+    <div class="widget-count" id="coach-count">0</div>
+</div>
+
+<!-- TRAIN -->
+<div class="widget train">
+    <div class="widget-content" style="flex-direction: row; align-items: center; gap: 6px;">
+        <div class="live-tag" style="margin: 0;">
+            <span class="flash-dot"></span>Live
+        </div>
+        <div class="widget-label" style="margin: 0;">Trains</div>
+    </div>
+    <div class="widget-count" id="train-count">0</div>
+</div>
+
+<!-- FERRY -->
+<div class="widget ferry">
+    <div class="widget-content" style="flex-direction: row; align-items: center; gap: 6px;">
+        <div class="live-tag" style="margin: 0;">
+            <span class="flash-dot"></span>Live
+        </div>
+        <div class="widget-label" style="margin: 0;">Ferries</div>
+    </div>
+    <div class="widget-count" id="ferry-count">0</div>
+</div>
+
+<!-- PLANE -->
+<div class="widget plane">
+    <div class="widget-content" style="flex-direction: row; align-items: center; gap: 6px;">
+        <div class="live-tag" style="margin: 0;">
+            <span class="flash-dot"></span>Live
+        </div>
+        <div class="widget-label" style="margin: 0;">Planes</div>
+    </div>
+    <div class="widget-count" id="plane-count">0</div>
+</div>
+
+<!-- FILTER BUTTON -->
+<div class="widget" style="border-left-color:#fff; cursor:pointer;" onclick="toggleServiceFilter()">
+    <div class="widget-content" style="flex-direction: row; align-items: center; gap: 6px;">
+        <div class="widget-label" style="margin: 0;">Filter Services ▼</div>
+    </div>
+</div>
+
+<!-- FILTER PANEL -->
+<div id="service-filter-panel"
+     style="display:none;
+            background:rgba(255,255,255,0.05);
+            border:2px solid rgba(255,255,255,0.15);
+            border-radius:10px;
+            padding:12px;
+            margin-top:-10px;
+            margin-bottom:20px;
+            font-size:12px;
+            font-family:sans-serif;
+            color:#fff;">
+
+    <div style="font-weight:bold; margin-bottom:6px; opacity:0.9;">Modes</div>
+
+    <label><input type="checkbox" class="mode-filter" value="bus" checked> Buses</label><br>
+    <label><input type="checkbox" class="mode-filter" value="coach" checked> Coaches</label><br>
+    <label><input type="checkbox" class="mode-filter" value="train" checked> Trains</label><br>
+    <label><input type="checkbox" class="mode-filter" value="ferry" checked> Ferries</label><br>
+    <label><input type="checkbox" class="mode-filter" value="plane" checked> Planes</label><br>
+
+</div>
+</div>
+
+<div id="map"></div>
+
+<script>
+
+let enabledModes = {
+    bus: true,
+    coach: true,
+    train: true,
+    ferry: true,
+    plane: true
+};
+
+document.addEventListener("change", (e) => {
+    if (e.target.classList.contains("mode-filter")) {
+        enabledModes[e.target.value] = e.target.checked;
+        console.log("Enabled modes:", enabledModes);
+        // Later: updateMap() will use this
+    }
+});
+
+/* --------------------------------------------------
+   API CONFIG (placeholders only)
+-------------------------------------------------- */
+const API = {
+    bus: { enabled: false, url: "", key: "" },
+    coach: { enabled: false, url: "", key: "" },
+    train: { enabled: false, url: "", key: "" },
+    ferry: { enabled: false, url: "", key: "" },
+    plane: { enabled: false, url: "", key: "" }
+};
+
+/* --------------------------------------------------
+   EMPTY LOADERS
+-------------------------------------------------- */
+async function loadBusData() { return []; }
+async function loadCoachData() { return []; }
+async function loadTrainData() { return []; }
+async function loadFerryData() { return []; }
+async function loadPlaneData() { return []; }
+
+/* --------------------------------------------------
+   MASTER LOADER
+-------------------------------------------------- */
+async function loadAllTransitData() {
+    updateMap([]);
+}
+
+/* --------------------------------------------------
+   MAP + MARKERS
+-------------------------------------------------- */
+let activeMarkers = {};
+
+function updateMap(vehicles) {
+    document.getElementById("bus-count").innerText = 0;
+    document.getElementById("coach-count").innerText = 0;
+    document.getElementById("train-count").innerText = 0;
+    document.getElementById("ferry-count").innerText = 0;
+    document.getElementById("plane-count").innerText = 0;
+}
+
+/* --------------------------------------------------
+   MAP INITIALISATION (FIXED)
+-------------------------------------------------- */
+const KERNOW_BOUNDS = [
+    [-6.8, 49.7],
+    [-3.4, 51.3]
+];
+
+const savedCenter = localStorage.getItem('ayty-center');
+const savedZoom = localStorage.getItem('ayty-zoom');
+
+const map = new maplibregl.Map({
+    container: 'map',
+    style: {
+        version: 8,
+        sources: {
+            'osm': {
+                type: 'raster',
+                tiles: [
+                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+                ],
+                tileSize: 256,
+                attribution: '© OpenStreetMap contributors'
+            }
+        },
+        layers: [
+            {
+                id: 'osm',
+                type: 'raster',
+                source: 'osm'
+            }
+        ]
+    },
+    maxBounds: KERNOW_BOUNDS,
+    minZoom: 7,
+    center: savedCenter ? JSON.parse(savedCenter) : [-5.05, 50.26],
+    zoom: savedZoom ? parseFloat(savedZoom) : 8.5
+});
+
+map.on('moveend', () => {
+    localStorage.setItem('ayty-center', JSON.stringify(map.getCenter()));
+    localStorage.setItem('ayty-zoom', map.getZoom());
+});
+
+
+function toggleServiceFilter() {
+    const panel = document.getElementById("service-filter-panel");
+    panel.style.display = (panel.style.display === "none") ? "block" : "none";
+}
+
+
+
+map.on('load', () => {
+    loadAllTransitData();
+});
+</script>
+
+</body>
+</html>
